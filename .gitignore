@@ -1,0 +1,5 @@
+*.log
+*.sublime*
+~*
+.DS_Store
+thumbs.db

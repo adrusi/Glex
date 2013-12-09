@@ -1,7 +1,7 @@
 package glex
 
 import (
-	"bufio"
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -26,24 +26,26 @@ const (
 )
 
 func TestScannerTransactionTransparency(t *testing.T) {
-	a := newScannerTransaction(bufio.NewReader(strings.NewReader(lorem)))
-	b := bufio.NewReader(strings.NewReader(lorem))
+	a := newScannerTransaction(newRuneScanner(strings.NewReader(lorem)))
+	b := newRuneScanner(strings.NewReader(lorem))
 	var err error
 	for err == nil {
-		r1, _, err := a.ReadRune()
-		r2, _, err := b.ReadRune()
+		var r1 rune
+		var r2 rune
+		r1, _, err = a.ReadRune()
+		r2, _, err = b.ReadRune()
 		if r1 != r2 {
 			t.Error(
 				"Rune from scannerTransaction did not match rune from bufio.")
 		}
 	}
-	a.Commit()
+	a.commit()
 }
 
 func TestRevert(t *testing.T) {
-	a := bufio.NewReader(strings.NewReader(lorem))
+	a := newRuneScanner(strings.NewReader(lorem))
 	const depth = 20
-	s1, s2 = make([]rune, depth), make([]rune, depth)
+	s1, s2 := make([]rune, depth), make([]rune, depth)
 	for _, s := range [][]rune{s1, s2} {
 		b := newScannerTransaction(a)
 		for i := 0; i < depth; i++ {
@@ -56,15 +58,20 @@ func TestRevert(t *testing.T) {
 			t.Errorf("Runes after revert did not match after position %d", i)
 		}
 	}
+	if t.Failed() {
+		fmt.Printf("Expected: %s\nFound:    %s", string(s1), string(s2))
+	}
 }
 
 func TestFilePosReaderTransparency(t *testing.T) {
-	a := newFilePosReader(bufio.NewReader(strings.NewReader(lorem)))
-	b := bufio.NewReader(strings.NewReader(lorem))
+	a := newFilePosReader(newRuneScanner(strings.NewReader(lorem)))
+	b := newRuneScanner(strings.NewReader(lorem))
 	var err error
 	for err == nil {
-		r1, _, err := a.ReadRune()
-		r2, _, err := b.ReadRune()
+		var r1 rune
+		var r2 rune
+		r1, _, err = a.ReadRune()
+		r2, _, err = b.ReadRune()
 		if r1 != r2 {
 			t.Error(
 				"Rune from filePosReader did not match rune from bufio.")
@@ -73,17 +80,48 @@ func TestFilePosReaderTransparency(t *testing.T) {
 }
 
 func TestLineCount(t *testing.T) {
-	func test(name, s string, c int) {
-		a := newFilePosReader(bufio.NewReader(strings.NewReader(s)))
+	test := func(name, s string, c int) {
+		a := newFilePosReader(newRuneScanner(strings.NewReader(s)))
 		var err error
 		for err == nil {
-			_, _, err := a.ReadRune()
+			_, _, err = a.ReadRune()
 		}
 		if a.line != c {
-			t.Errorf("filePosReader failed to save line number of %s.", name)
+			t.Errorf(
+				"filePosReader failed to save line number of %s. "+
+					"It reported %d but should have reported %d.",
+				name, a.line, c)
+
 		}
 	}
 	test("lorem", lorem, loremLineCount)
-	test("http",  http,  httpLineCount)
-	test("utf",   utf,   utfLineCount)
+	test("http", http, httpLineCount)
+	test("utf", utf, utfLineCount)
+}
+
+func TestRecallReaderTransparency(t *testing.T) {
+	a := newRecallReader(newRuneScanner(strings.NewReader(lorem)))
+	b := newRuneScanner(strings.NewReader(lorem))
+	var err error
+	for err == nil {
+		var r1 rune
+		var r2 rune
+		r1, _, err = a.ReadRune()
+		r2, _, err = b.ReadRune()
+		if r1 != r2 {
+			t.Error(
+				"Rune from recallReader did not match rune from bufio.")
+		}
+	}
+}
+
+func TestRecollection(t *testing.T) {
+	a := newRecallReader(newRuneScanner(strings.NewReader(lorem)))
+	var err error
+	for err == nil {
+		_, _, err = a.ReadRune()
+	}
+	if a.recall() != lorem {
+		t.Error("recallReader did not recall correctly.")
+	}
 }
